@@ -1,10 +1,13 @@
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -50,7 +53,7 @@ public class Chatbot {
 		indexWriter = new IndexWriter(directoryPost, indexWriterConfig);
 		String queryStr = "";
 		
-		System.out.println("載入 562074 個標題中...");
+		System.out.println("載入 1048315 個標題中...");
 		JSONParser parserPost = new JSONParser();
         JSONArray posts = (JSONArray) parserPost.parse(new FileReader("postAfterChineseTextSegmentation.json"));
         for(Object object : posts) {
@@ -62,7 +65,7 @@ public class Chatbot {
         indexWriter.close();
         System.out.println(posts.size() + " 個標題已完成載入");
         
-        System.out.println("載入 2727863 個回覆中...");
+        System.out.println("載入 5111606 個回覆中...");
         JSONParser parserComment = new JSONParser();
         JSONArray comments = (JSONArray) parserComment.parse(new FileReader("commentAfterChineseTextSegmentation.json"));
         HashMap commentHashMap = new HashMap();
@@ -72,15 +75,7 @@ public class Chatbot {
 	    		JSONArray contents = (JSONArray) comment.get("content");
 	    		commentHashMap.put(id, contents);
 	    }
-        System.out.println(comments.size() + " 個回覆已完成載入");
-        
-        //read Chinese stop words
-        Scanner stopwordScanner = new Scanner(new File("chinese_sw.txt"));
-        HashSet<String> stopwords = new HashSet<String>();
-        while (stopwordScanner.hasNext()){
-        	stopwords.add(stopwordScanner.next());
-        }
-        stopwordScanner.close();
+        System.out.println("5111606 個回覆已完成載入");
 
         mmseg4j seg = new mmseg4j();
         
@@ -89,55 +84,96 @@ public class Chatbot {
 	        Scanner scanner = new Scanner(System.in);
 	        queryStr = scanner.nextLine();
 	        
-	        String querystrAfterChineseTextSegmentation = seg.segmentation(queryStr, stopwords);
-	        
-	        Query query = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
-	        
-	        int hitsPerPage = 10;
-			IndexReader indexReader = DirectoryReader.open(directoryPost);
-			IndexSearcher indexSearcher = new IndexSearcher(indexReader);
-			indexSearcher.setSimilarity(new BM25Similarity());
-			TopScoreDocCollector topScoreDocCollector = TopScoreDocCollector.create(hitsPerPage);
-			indexSearcher.search(query, topScoreDocCollector);
-			ScoreDoc[] hits = topScoreDocCollector.topDocs().scoreDocs;
-			
-			standardAnalyzer = new StandardAnalyzer();
-//	        directoryComment = FSDirectory.open(Paths.get(INDEX_DIRECTORY_COMMENT));
-			directoryComment = new RAMDirectory();
-			indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-			indexWriter = new IndexWriter(directoryComment, indexWriterConfig);
-			
-			System.out.println("以下是相似度前 " + hits.length + " 高的標題");
-			DecimalFormat nf = new DecimalFormat("#0.000000");
-			for(int i = 0; i < hits.length; ++i) {
-				int docId = hits[i].doc;
-				Document d = indexSearcher.doc(docId);
+	        if(!queryStr.isEmpty()) {
+		        String querystrAfterChineseTextSegmentation = seg.segmentation(queryStr);
 		        
-				Object comment = commentHashMap.get(d.get("id"));
-				JSONArray contents = (JSONArray) comment;
-				for(int j = 1; j < contents.size(); j++) {
-					addContent(indexWriter, contents.get(j).toString(), d.get("id"), String.valueOf(j+1));
+		        Query query = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
+		        
+		        int hitsPerPage = 10;
+				IndexReader indexReader = DirectoryReader.open(directoryPost);
+				IndexSearcher indexSearcher = new IndexSearcher(indexReader);
+				indexSearcher.setSimilarity(new BM25Similarity());
+				TopScoreDocCollector topScoreDocCollector = TopScoreDocCollector.create(hitsPerPage);
+				indexSearcher.search(query, topScoreDocCollector);
+				ScoreDoc[] hits = topScoreDocCollector.topDocs().scoreDocs;
+				
+				standardAnalyzer = new StandardAnalyzer();
+	//	        directoryComment = FSDirectory.open(Paths.get(INDEX_DIRECTORY_COMMENT));
+				directoryComment = new RAMDirectory();
+				indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+				indexWriter = new IndexWriter(directoryComment, indexWriterConfig);
+				List<Post> postList = new ArrayList<Post>();
+				List<Comment> commentList = new ArrayList<Comment>();
+				
+				System.out.println("以下是相似度前 " + hits.length + " 高的標題");
+				DecimalFormat nf = new DecimalFormat("#0.000000");
+				for(int i = 0; i < hits.length; ++i) {
+					int docId = hits[i].doc;
+					Document d = indexSearcher.doc(docId);
+					Post p = new Post();
+			        
+					Object comment = commentHashMap.get(d.get("id"));
+					JSONArray contents = (JSONArray) comment;
+					for(int j = 1; j < contents.size(); j++) {
+						addContent(indexWriter, contents.get(j).toString(), d.get("id"), String.valueOf(j+1));
+						Comment c = new Comment();
+						c.setId(d.get("id"));
+						c.setI(String.valueOf(j+1));
+						c.setTitle(contents.get(j).toString());
+						c.setScore(0);
+						if(!c.getTitle().isEmpty())
+							commentList.add(c);
+					}
+					p.setId(d.get("id"));
+					p.setTitle(d.get("title").replace(" | ", ""));
+					p.setScore(hits[i].score * hits[i].score);
+					postList.add(p);
+					System.out.println(d.get("id") + " \t " + d.get("title").replace(" | ", "") + " \t" + nf.format(hits[i].score));
 				}
 				
-				System.out.println(d.get("id") + " \t " + d.get("title").replace(" | ", "") + " \t" + nf.format(hits[i].score));
-			}
-			
-			indexWriter.close();
-			indexReader.close();
-			
-			hitsPerPage = 100;
-			IndexReader indexReaderComment = DirectoryReader.open(directoryComment);
-			IndexSearcher indexSearcherComment = new IndexSearcher(indexReaderComment);
-			indexSearcherComment.setSimilarity(new BM25Similarity());
-			TopScoreDocCollector topScoreDocCollectorComment = TopScoreDocCollector.create(hitsPerPage);
-			indexSearcherComment.search(query, topScoreDocCollectorComment);
-			hits = topScoreDocCollectorComment.topDocs().scoreDocs;
-			System.out.println("以下是相似度前 " + hits.length + " 高的回覆");
-			for(int i = 0; i < hits.length; ++i) {
-				int docId = hits[i].doc;
-				Document d = indexSearcherComment.doc(docId);
-				System.out.println(d.get("id") + "-" + d.get("i") + "\t " + d.get("title").replace(" | ", "") + " \t" + nf.format(hits[i].score));
-			}
+				indexWriter.close();
+				indexReader.close();
+				
+				hitsPerPage = 100;
+				IndexReader indexReaderComment = DirectoryReader.open(directoryComment);
+				IndexSearcher indexSearcherComment = new IndexSearcher(indexReaderComment);
+				indexSearcherComment.setSimilarity(new BM25Similarity());
+				TopScoreDocCollector topScoreDocCollectorComment = TopScoreDocCollector.create(hitsPerPage);
+				indexSearcherComment.search(query, topScoreDocCollectorComment);
+				hits = topScoreDocCollectorComment.topDocs().scoreDocs;
+				for(Comment c : commentList) {
+					float postScore = 0;
+					for(Post p : postList) {
+						if(p.getId().equals(c.getId())) {
+							postScore = p.getScore();
+						}
+					}
+					c.setScore(postScore);
+					
+					for(int i = 0; i < hits.length; ++i) {
+						int docId = hits[i].doc;
+						Document d = indexSearcherComment.doc(docId);
+						
+						if(c.getId().equals(d.get("id")) && c.getI().equals(d.get("i"))) {
+							c.setScore(postScore + (hits[i].score * hits[i].score));
+						}
+					}
+				}
+				
+				//sort the commentList
+				Collections.sort(commentList,
+				        new Comparator<Comment>() {
+				            public int compare(Comment c1, Comment c2) {
+				                return (int) (c2.getScore() - c1.getScore());
+				            }
+				        });
+				System.out.println("以下是相似度前 " + commentList.size() + " 高的回覆");
+				for (Comment c : commentList) {
+					System.out.println(c.getId() + "-" + c.getI() + "\t " + c.getTitle().replace(" | ", "") + " \t" + nf.format(c.getScore()));
+		        }
+	        }else {
+	        		System.out.println("輸入錯誤，再說多次吧。");
+	        }
         }
 	}
 	

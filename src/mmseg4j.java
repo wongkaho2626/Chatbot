@@ -18,7 +18,7 @@ public class mmseg4j {
 		dic = Dictionary.getInstance();
 	}  
 	
-	public String segmentation(String sentence, HashSet<String> stopwords) throws IOException {
+	public String segmentation(String sentence) throws IOException {
 		Reader reader = new StringReader(sentence);  
 	    StringBuilder stringBuilder = new StringBuilder();  
 	    ComplexSeg seg = new ComplexSeg(dic);  
@@ -26,9 +26,6 @@ public class mmseg4j {
 	    Word word = null;  
 	    boolean first = true;  
 	    while((word = mmSeg.next()) != null) {  
-//	        if(stopwords.contains(word.getString())) {
-//	        		break;
-//	        }
 	        if(!first) {  
         			stringBuilder.append(" ");  
 	        }
