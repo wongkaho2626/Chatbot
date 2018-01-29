@@ -1,6 +1,8 @@
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,8 +37,10 @@ import org.json.simple.parser.ParseException;
 
 public class Chatbot {
 	
-	static final String INDEX_DIRECTORY_POST = "/Users/wongkaho/Eclipse Workspace/Chatbot/INDEX_DIRECTORY_POST";
-	static final String INDEX_DIRECTORY_COMMENT = "/Users/wongkaho/Eclipse Workspace/Chatbot/INDEX_DIRECTORY_COMMENT";
+	private static final String INDEX_DIRECTORY = "/Users/wongkaho/Eclipse Workspace/Chatbot/resources/INDEX_DIRECTORY/";
+	private static final String RESOURCE = "/Users/wongkaho/Eclipse Workspace/Chatbot/resources/";
+	private static final String COMMENT = "commentAfterChineseTextSegmentation";
+	private static final String POST = "postAfterChineseTextSegmentation";
 	
 	public static void main (String [] args) throws IOException, ParseException, Exception {
 		System.out.println("正在啟動自動回答機械人");
@@ -45,37 +49,33 @@ public class Chatbot {
 		Directory directoryPost, directoryComment;
 		IndexWriterConfig indexWriterConfig;
 		IndexWriter indexWriter;
-				
-		standardAnalyzer = new StandardAnalyzer();
-		directoryPost = new RAMDirectory();
-//		directoryPost = FSDirectory.open(Paths.get(INDEX_DIRECTORY_POST));
-		indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-		indexWriter = new IndexWriter(directoryPost, indexWriterConfig);
 		String queryStr = "";
-		
-		System.out.println("載入 1048315 個標題中...");
-		JSONParser parserPost = new JSONParser();
-        JSONArray posts = (JSONArray) parserPost.parse(new FileReader("postAfterChineseTextSegmentation.json"));
-        for(Object object : posts) {
-        		JSONObject post = (JSONObject) object;
-        		String title = (String) post.get("title");
-        		String id = (String) post.get("id");
-        		addContent(indexWriter, title, id);
-        }
-        indexWriter.close();
-        System.out.println(posts.size() + " 個標題已完成載入");
-        
-        System.out.println("載入 5111606 個回覆中...");
-        JSONParser parserComment = new JSONParser();
-        JSONArray comments = (JSONArray) parserComment.parse(new FileReader("commentAfterChineseTextSegmentation.json"));
-        HashMap commentHashMap = new HashMap();
-        for(Object objectComment : comments) {
-	    		JSONObject comment = (JSONObject) objectComment;
-	    		String id = (String) comment.get("id");
-	    		JSONArray contents = (JSONArray) comment.get("content");
-	    		commentHashMap.put(id, contents);
-	    }
-        System.out.println("5111606 個回覆已完成載入");
+		standardAnalyzer = new StandardAnalyzer();
+			
+		//check whether done the indexing
+		File file = new File(INDEX_DIRECTORY);
+		if (!file.exists()) {
+			file.mkdir();
+		}
+		if(file.list().length > 0){
+			directoryPost = FSDirectory.open(Paths.get(INDEX_DIRECTORY));
+		}else {
+			directoryPost = FSDirectory.open(Paths.get(INDEX_DIRECTORY));
+			indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+			indexWriter = new IndexWriter(directoryPost, indexWriterConfig);
+			
+			System.out.println("載入 3922512 個標題中...");
+			JSONParser parserPost = new JSONParser();
+	        JSONArray posts = (JSONArray) parserPost.parse(new FileReader(RESOURCE + POST + ".json"));
+	        for(Object object : posts) {
+	        		JSONObject post = (JSONObject) object;
+	        		String title = (String) post.get("title");
+	        		String id = (String) post.get("id");
+	        		addContent(indexWriter, title, id);
+	        }
+	        indexWriter.close();
+	        System.out.println("3922512 個標題已完成載入");
+		}
 
         mmseg4j seg = new mmseg4j();
         
@@ -98,7 +98,6 @@ public class Chatbot {
 				ScoreDoc[] hits = topScoreDocCollector.topDocs().scoreDocs;
 				
 				standardAnalyzer = new StandardAnalyzer();
-	//	        directoryComment = FSDirectory.open(Paths.get(INDEX_DIRECTORY_COMMENT));
 				directoryComment = new RAMDirectory();
 				indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
 				indexWriter = new IndexWriter(directoryComment, indexWriterConfig);
@@ -107,11 +106,26 @@ public class Chatbot {
 				
 				System.out.println("以下是相似度前 " + hits.length + " 高的標題");
 				DecimalFormat nf = new DecimalFormat("#0.000000");
+				
+				HashMap commentHashMap = new HashMap();
+				for(int i = 0; i < hits.length; ++i) {
+					int docId = hits[i].doc;
+					Document d = indexSearcher.doc(docId);
+					int shortID = Integer.valueOf(d.get("id")) / 10000;
+					JSONParser parserComment = new JSONParser();
+			        JSONArray comments = (JSONArray) parserComment.parse(new FileReader(RESOURCE + COMMENT + shortID + ".json"));
+			        for(Object objectComment : comments) {
+				    		JSONObject comment = (JSONObject) objectComment;
+				    		String id = (String) comment.get("id");
+				    		JSONArray contents = (JSONArray) comment.get("content");
+				    		commentHashMap.put(id, contents);
+				    }
+				}
+				
 				for(int i = 0; i < hits.length; ++i) {
 					int docId = hits[i].doc;
 					Document d = indexSearcher.doc(docId);
 					Post p = new Post();
-			        
 					Object comment = commentHashMap.get(d.get("id"));
 					JSONArray contents = (JSONArray) comment;
 					for(int j = 1; j < contents.size(); j++) {
