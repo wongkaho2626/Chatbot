@@ -25,6 +25,7 @@ import javax.swing.GroupLayout.Alignment;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.border.EmptyBorder;
 
+import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -56,7 +57,7 @@ public class Chatbot extends JFrame{
 	private static final String POST = "postAfterChineseTextSegmentation";
 	private JPanel contentPane;
 	private JTextField textField;
-
+	Logger logger = Logger.getLogger(Chatbot.class);
 
 	public static void main (String [] args){
 		EventQueue.invokeLater(new Runnable() {
@@ -124,12 +125,12 @@ public class Chatbot extends JFrame{
 		contentPane.setLayout(gl_contentPane);
 
 		textArea.append("正在啟動自動回答機械人... \n");
+		logger.info("正在啟動自動回答機械人...");
 
 		StandardAnalyzer standardAnalyzer;
 		Directory directoryPost;
 		IndexWriterConfig indexWriterConfig;
 		IndexWriter indexWriter;
-		//		String queryStr = "";
 		standardAnalyzer = new StandardAnalyzer();
 
 		//check whether done the indexing
@@ -144,7 +145,8 @@ public class Chatbot extends JFrame{
 			indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
 			indexWriter = new IndexWriter(directoryPost, indexWriterConfig);
 
-			textArea.append("載入 3922512 個標題中...");
+			textArea.append("載入 3922512 個標題中...\n");
+			logger.info("載入 3922512 個標題中...");
 			JSONParser parserPost = new JSONParser();
 			JSONArray posts = (JSONArray) parserPost.parse(new FileReader(RESOURCE + POST + ".json"));
 			for(Object object : posts) {
@@ -155,11 +157,13 @@ public class Chatbot extends JFrame{
 			}
 			indexWriter.close();
 			textArea.append("3922512 個標題已完成載入\n");
+			logger.info("3922512 個標題已完成載入");
 		}
 
 		mmseg4j seg = new mmseg4j();
 
 		textArea.append("我係自動回答機械人，隨便說吧: \n");
+		logger.info("我係自動回答機械人，隨便說吧:");
 
 		btnNewButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -203,6 +207,7 @@ public class Chatbot extends JFrame{
 
 	private void sendRequest(JTextArea textArea, mmseg4j seg, StandardAnalyzer standardAnalyzer, Directory directoryPost) throws Exception{
 		textArea.append("你： " + textField.getText() + "\n");
+		logger.info("你： " + textField.getText());
 		String queryStr = textField.getText();
 		textField.setText("");
 
@@ -226,8 +231,7 @@ public class Chatbot extends JFrame{
 			List<Post> postList = new ArrayList<Post>();
 			List<Comment> commentList = new ArrayList<Comment>();
 
-//			textArea.append("以下是相似度前 " + hits.length + " 高的標題" + "\n");
-			System.out.println("以下是相似度前 " + hits.length + " 高的標題");
+			logger.info("以下是相似度前 " + hits.length + " 高的標題");
 			DecimalFormat nf = new DecimalFormat("#0.000000");
 
 			HashMap commentHashMap = new HashMap();
@@ -265,8 +269,7 @@ public class Chatbot extends JFrame{
 				p.setTitle(d.get("title").replace(" | ", ""));
 				p.setScore(hits[i].score * hits[i].score);
 				postList.add(p);
-//				textArea.append(d.get("id") + " \t " + d.get("title").replace(" | ", "") + " \t" + nf.format(hits[i].score) + "\n");
-				System.out.println(d.get("id") + " \t " + d.get("title").replace(" | ", "") + " \t" + nf.format(hits[i].score));
+				logger.info(d.get("id") + "   " + d.get("title").replace(" | ", "") + "  " + nf.format(hits[i].score));
 			}
 
 			indexWriter.close();
@@ -307,18 +310,15 @@ public class Chatbot extends JFrame{
 					return (int) (c2.getScore() - c1.getScore());
 				}
 			});
-//			textArea.append("以下是相似度前 " + commentList.size() + " 高的回覆" + "\n");
-			System.out.println("以下是相似度前 " + commentList.size() + " 高的回覆");
 			textArea.append("機械人： " + commentList.get(0).getTitle().replace(" | ", "") + "\n");
+			logger.info("機械人： " + commentList.get(0).getTitle().replace(" | ", ""));
+			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
 			for (Comment c : commentList) {
-//				textArea.append(c.getId() + "-" + c.getI() + "\t " + c.getTitle().replace(" | ", "") + " \t" + nf.format(c.getScore()) + "\n");
-				System.out.println(c.getId() + "-" + c.getI() + "\t " + c.getTitle().replace(" | ", "") + " \t" + nf.format(c.getScore()));
+				logger.info(c.getId() + "-" + c.getI() + "  " + c.getTitle().replace(" | ", "") + "  " + nf.format(c.getScore()));
 			}
 		}else {
 			textArea.append("輸入錯誤，再說多次吧。" + "\n");
-			//	System.out.println("輸入錯誤，再說多次吧。");
 		}
-//		textArea.append("我係自動回答機械人，隨便說吧: ");
 	}
 
 }
