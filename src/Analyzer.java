@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -48,27 +49,33 @@ public class Analyzer {
 	private static final String COMMENT = "commentAfterChineseTextSegmentation";
 	private static final String POST = "postAfterChineseTextSegmentation";
 	
-	Logger logger = Logger.getLogger(Analyzer.class);
-	JTextField textField;
-	JTextArea textArea;
-	JButton btnNewButton;
-	NumberFormat nf = new DecimalFormat("###");			
-	
 	StandardAnalyzer standardAnalyzer;
 	Directory directoryPost;
 	IndexWriterConfig indexWriterConfig;
 	IndexWriter indexWriter;
 	mmseg4j seg;
 	
-	public Analyzer(JTextField textField, JTextArea textArea, JButton btnNewButton) {
+	JTextField textField;
+	JTextArea textArea;
+	JButton btn;
+	boolean multiRound;
+	String queryStr = "";
+	int cntRound = 0;
+	List<String> reply = new ArrayList<String>();
+	NumberFormat nf = new DecimalFormat("###");			
+	
+	Logger logger = Logger.getLogger(Analyzer.class);
+
+	public Analyzer(JTextField textField, JTextArea textArea, JButton btn, boolean multiRound) {
 		this.textField = textField;
 		this.textArea = textArea;
-		this.btnNewButton = btnNewButton;
+		this.btn = btn;
+		this.multiRound = multiRound;
 	}
 	
 	public void eventBuilder() throws IOException, ParseException, Exception {
 		textField.setEnabled(false);
-		btnNewButton.setEnabled(false);
+		btn.setEnabled(false);
 		textArea.append("正在啟動自動回答機械人... \n");
 		logger.info("正在啟動自動回答機械人...");
 		
@@ -91,19 +98,11 @@ public class Analyzer {
 			logger.info("載入 3922512 個標題中...");
 			JSONParser parserPost = new JSONParser();
 			JSONArray posts = (JSONArray) parserPost.parse(new FileReader(RESOURCE + POST + ".json"));
-//			double cnt = 0.0;
-//			double progress, preprogress = 0;
 			for(Object object : posts) {
 				JSONObject post = (JSONObject) object;
 				String title = (String) post.get("title");
 				String id = (String) post.get("id");
 				addContent(indexWriter, title, id);
-//				cnt++;
-//				progress = cnt / posts.size() * 100;
-//				if(progress != preprogress) {
-//					textArea.setText("正在啟動自動回答機械人... \n載入 3922512 個標題中..." + nf.format(progress) + "%");
-//					preprogress = progress;
-//				}
 			}
 			indexWriter.close();
 			textArea.append("3922512 個標題已完成載入\n");
@@ -114,14 +113,13 @@ public class Analyzer {
 		logger.info("我係自動回答機械人，隨便說吧:");
 		
 		textField.setEnabled(true);
-		btnNewButton.setEnabled(true);
+		btn.setEnabled(true);
 
-		btnNewButton.addActionListener(new ActionListener() {
+		btn.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				try {
-					sendRequest(textArea, seg, standardAnalyzer, directoryPost);
+					sendRequest(textArea, seg, standardAnalyzer, directoryPost, multiRound);
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
 					logger.error(e1.getLocalizedMessage());
 				}
 			}
@@ -131,9 +129,8 @@ public class Analyzer {
 			public void keyPressed(KeyEvent e) {
 				if (e.getKeyCode()==KeyEvent.VK_ENTER) {
 					try {
-						sendRequest(textArea, seg, standardAnalyzer, directoryPost);
+						sendRequest(textArea, seg, standardAnalyzer, directoryPost, multiRound);
 					} catch (Exception e1) {
-						// TODO Auto-generated catch block
 						logger.error(e1.getLocalizedMessage());
 					}
 				}
@@ -141,22 +138,32 @@ public class Analyzer {
 		});
 	}
 	
-	private void sendRequest(JTextArea textArea, mmseg4j seg, StandardAnalyzer standardAnalyzer, Directory directoryPost) throws Exception{
+	private void sendRequest(JTextArea textArea, mmseg4j seg, StandardAnalyzer standardAnalyzer, Directory directoryPost, boolean multiRound) throws Exception{
 		textArea.append("你： " + textField.getText() + "\n");
 		logger.info("你： " + textField.getText());
-		String queryStr = textField.getText();
+		if(multiRound) {
+			if(cntRound == 3) {
+				reset();
+			}
+			queryStr = textField.getText() + " " + queryStr;
+			cntRound++;
+		}else {
+			queryStr = textField.getText();
+		}
 		textField.setText("");
 
 		if(!queryStr.isEmpty()) {
 			String querystrAfterChineseTextSegmentation = seg.segmentation(queryStr);
+			System.out.println(querystrAfterChineseTextSegmentation);
 
 			Query query = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
 
-			int hitsPerPage = 10;
+			int hitsPerPage = 100;
 			IndexReader indexReader = DirectoryReader.open(directoryPost);
 			IndexSearcher indexSearcher = new IndexSearcher(indexReader);
-			indexSearcher.setSimilarity(new BM25Similarity());
-			TopScoreDocCollector topScoreDocCollector = TopScoreDocCollector.create(hitsPerPage);
+			indexSearcher.setSimilarity(new BM25Similarity((float)1.2, 1));
+			ScoreDoc scoreDoc = new ScoreDoc(20, 200);
+			TopScoreDocCollector topScoreDocCollector = TopScoreDocCollector.create(hitsPerPage, scoreDoc);
 			indexSearcher.search(query, topScoreDocCollector);
 			ScoreDoc[] hits = topScoreDocCollector.topDocs().scoreDocs;
 
@@ -180,7 +187,7 @@ public class Analyzer {
 				for(Object objectComment : comments) {
 					JSONObject comment = (JSONObject) objectComment;
 					String id = (String) comment.get("id");
-					JSONArray contents = (JSONArray) comment.get("content");
+					JSONArray contents = (JSONArray) comment.get("contents");
 					commentHashMap.put(id, contents);
 				}
 			}
@@ -189,17 +196,24 @@ public class Analyzer {
 				int docId = hits[i].doc;
 				Document d = indexSearcher.doc(docId);
 				Post p = new Post();
-				Object comment = commentHashMap.get(d.get("id"));
-				JSONArray contents = (JSONArray) comment;
-				for(int j = 1; j < contents.size(); j++) {
-					addContent(indexWriter, contents.get(j).toString(), d.get("id"), String.valueOf(j+1));
-					Comment c = new Comment();
-					c.setId(d.get("id"));
-					c.setI(String.valueOf(j+1));
-					c.setTitle(contents.get(j).toString());
-					c.setScore(0);
-					if(!c.getTitle().isEmpty())
-						commentList.add(c);
+				JSONArray contents = (JSONArray) commentHashMap.get(d.get("id"));
+				for(Object o : contents) {
+					JSONObject jo = (JSONObject) o;
+					String content = jo.get("content").toString();
+					String contentAfterSegmentation = jo.get("contentAfterSegmentation").toString();
+					String I = jo.get("i").toString();
+					if(Integer.valueOf(I) > 1) {
+						addContent(indexWriter, contentAfterSegmentation, d.get("id"), I);
+						Comment c = new Comment();
+						c.setId(d.get("id"));
+						c.setI(I);
+						c.setContent(content.trim());
+						c.setContentAfterSegmentation(contentAfterSegmentation);
+						c.setScore(0);
+						if(!c.getContent().isEmpty()) {
+							commentList.add(c);
+						}
+					}
 				}
 				p.setId(d.get("id"));
 				p.setTitle(d.get("title").replace(" | ", ""));
@@ -216,42 +230,68 @@ public class Analyzer {
 			IndexSearcher indexSearcherComment = new IndexSearcher(indexReaderComment);
 			indexSearcherComment.setSimilarity(new BM25Similarity());
 			TopScoreDocCollector topScoreDocCollectorComment = TopScoreDocCollector.create(hitsPerPage);
-			indexSearcherComment.search(query, topScoreDocCollectorComment);
+			Query query2 = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
+			indexSearcherComment.search(query2, topScoreDocCollectorComment);
 			hits = topScoreDocCollectorComment.topDocs().scoreDocs;
 			for(Comment c : commentList) {
 				float postScore = 0;
-				for(Post p : postList) {
-					if(p.getId().equals(c.getId())) {
-						postScore = p.getScore();
-					}
-				}
-				c.setScore(postScore);
 
 				for(int i = 0; i < hits.length; ++i) {
 					int docId = hits[i].doc;
 					Document d = indexSearcherComment.doc(docId);
 
 					if(c.getId().equals(d.get("id")) && c.getI().equals(d.get("i"))) {
-						float score = (hits[i].score * hits[i].score) / Integer.valueOf(c.getI());
-						//						System.out.println(c.getTitle() + score + " " + hits[i].score + " " + i);
-						c.setScore(postScore + score);
+						float score = (hits[i].score * hits[i].score);
+						c.setScore((postScore + score) / Integer.valueOf(c.getI()));
+					}
+					
+					if(c.getContent().contains("�")) {
+						c.setScore(0);
 					}
 				}
 			}
 
 			//sort the commentList
-			Collections.sort(commentList,
-					new Comparator<Comment>() {
+			Collections.sort(commentList, new Comparator<Comment>() {
 				public int compare(Comment c1, Comment c2) {
-					return (int) (c2.getScore() - c1.getScore());
+					return Double.compare(c2.getScore(), c1.getScore());
 				}
 			});
-			textArea.append("機械人： " + commentList.get(0).getTitle().replace(" | ", "") + "\n");
-			logger.info("機械人： " + commentList.get(0).getTitle().replace(" | ", ""));
-			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
-			for (Comment c : commentList) {
-				logger.info(c.getId() + "-" + c.getI() + "  " + c.getTitle().replace(" | ", "") + "  " + nf.format(c.getScore()));
+			
+			if(multiRound) {
+				if(cntRound == 0) {
+					textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+					logger.info("機械人： " + commentList.get(0).getContent());
+					logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+					for (Comment c : commentList) {
+						logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+					}
+					reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+				}else {
+					Iterator<Comment> i = commentList.iterator();
+					while (i.hasNext()) {
+						Comment c = i.next();
+						for(String r : reply)
+							if((c.getId() + "-" + c.getI()).equals(r))
+								i.remove();
+					}
+					textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+					logger.info("機械人： " + commentList.get(0).getContent());
+					logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+					for (Comment c : commentList) {
+						logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+					}
+					reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+				}
+			}else {
+				textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+				logger.info("機械人： " + commentList.get(0).getContent());
+				logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+				for (Comment c : commentList) {
+					logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+				}
 			}
+				
 		}else {
 			textArea.append("輸入錯誤，再說多次吧。" + "\n");
 		}
@@ -270,5 +310,17 @@ public class Analyzer {
 		document.add(new StringField("id", id, Field.Store.YES));
 		document.add(new StringField("i", i, Field.Store.YES));
 		indexWriter.addDocument(document);
+	}
+	
+	public void setMultiRound (boolean multiRound) {
+		this.multiRound = multiRound;
+		reset();
+		textArea.setText("我係自動回答機械人，隨便說吧:" + "\n");
+	}
+	
+	public void reset() {
+		queryStr = "";
+		cntRound = 0;
+		reply = new ArrayList<String>();
 	}
 }

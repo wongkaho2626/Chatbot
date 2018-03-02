@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -17,6 +18,9 @@ import java.util.List;
 import javax.swing.GroupLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -53,16 +57,25 @@ public class Chatbot extends JFrame{
 	private JPanel contentPane;
 	private static JTextField textField;
 	private static JTextArea textArea;
-	private static JButton btnNewButton;
+	private static JButton btn;
 	private JScrollPane scrollPane;
 	private GroupLayout gl_contentPane;
+	private JMenuBar menuBar;
+	private JMenu normalMenu;
+	private JMenu exitMenu;
+	private JMenu advancedMenu;
+	private JMenuItem mntmExit;
+	private JMenuItem mntmMultiroundConservation;
+	private JMenuItem mntmSingleroundConservation;
+	static Analyzer analyzer;
 	Logger logger = Logger.getLogger(Chatbot.class);
 
 	public static void main (String [] args) throws IOException, ParseException, Exception{
 		Chatbot frame = new Chatbot();
+		frame.setTitle("Smart Chatbot with Information Retrieval");
 		frame.setVisible(true);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		Analyzer analyzer = new Analyzer(textField, textArea, btnNewButton);
+		analyzer = new Analyzer(textField, textArea, btn, false);
 		analyzer.eventBuilder();
 	}
 
@@ -76,13 +89,52 @@ public class Chatbot extends JFrame{
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		setContentPane(contentPane);
+		
+		menuBar = new JMenuBar();
+		setJMenuBar(menuBar);
+		
+		normalMenu = new JMenu("Normal");
+		menuBar.add(normalMenu);
+		
+		mntmSingleroundConservation = new JMenuItem("Single-Round Conservation");
+		mntmSingleroundConservation.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				analyzer.setMultiRound(false);
+			}
+		});
+		normalMenu.add(mntmSingleroundConservation);
+		
+		advancedMenu = new JMenu("Advanced");
+		menuBar.add(advancedMenu);
+		
+		mntmMultiroundConservation = new JMenuItem("Multi-Round Conservation");
+		mntmMultiroundConservation.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				analyzer.setMultiRound(true);
+			}
+		});
+		advancedMenu.add(mntmMultiroundConservation);
+		
+		exitMenu = new JMenu("Exit");
+		menuBar.add(exitMenu);
+		
+		mntmExit = new JMenuItem("Exit");
+		mntmExit.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.exit(0);
+			}
+		});
+		exitMenu.add(mntmExit);
 
 		scrollPane = new JScrollPane();
 
 		textField = new JTextField();
 		textField.setColumns(10);
 
-		btnNewButton = new JButton("Send");
+		btn = new JButton("Send");
 
 		gl_contentPane = new GroupLayout(contentPane);
 		gl_contentPane.setHorizontalGroup(
@@ -92,7 +144,7 @@ public class Chatbot extends JFrame{
 								.addGroup(gl_contentPane.createSequentialGroup()
 										.addComponent(textField, GroupLayout.DEFAULT_SIZE, 318, Short.MAX_VALUE)
 										.addGap(9)
-										.addComponent(btnNewButton, GroupLayout.PREFERRED_SIZE, 110, GroupLayout.PREFERRED_SIZE)
+										.addComponent(btn, GroupLayout.PREFERRED_SIZE, 110, GroupLayout.PREFERRED_SIZE)
 										.addPreferredGap(ComponentPlacement.RELATED))
 								.addGroup(gl_contentPane.createSequentialGroup()
 										.addGap(6)
@@ -106,7 +158,7 @@ public class Chatbot extends JFrame{
 						.addGap(12)
 						.addGroup(gl_contentPane.createParallelGroup(Alignment.BASELINE)
 								.addComponent(textField, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-								.addComponent(btnNewButton, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+								.addComponent(btn, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
 						.addGap(3))
 				);
 
