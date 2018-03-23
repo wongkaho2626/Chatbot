@@ -100,6 +100,7 @@ public class Chatbot extends JFrame{
 		mntmSingleroundConservation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				analyzer.setSingleRound(true);
 				analyzer.setMultiRound(false);
 			}
 		});
@@ -112,6 +113,7 @@ public class Chatbot extends JFrame{
 		mntmMultiroundConservation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				analyzer.setSingleRound(false);
 				analyzer.setMultiRound(true);
 			}
 		});
