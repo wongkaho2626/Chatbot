@@ -61,8 +61,7 @@ public class Analyzer {
 	JTextField textField;
 	JTextArea textArea;
 	JButton btn;
-	boolean multiRound = false;
-	boolean singleRound = true;
+	String type = "singleRound";
 	String queryStr = "";
 	String extendqueryStr = "";
 	int cntRound = 0;
@@ -72,11 +71,10 @@ public class Analyzer {
 	
 	Logger logger = Logger.getLogger(Analyzer.class);
 
-	public Analyzer(JTextField textField, JTextArea textArea, JButton btn, boolean multiRound) {
+	public Analyzer(JTextField textField, JTextArea textArea, JButton btn) {
 		this.textField = textField;
 		this.textArea = textArea;
 		this.btn = btn;
-		this.multiRound = multiRound;
 	}
 	
 	public void eventBuilder() throws IOException, ParseException, Exception {
@@ -137,7 +135,7 @@ public class Analyzer {
 					try {
 						sendRequest(textArea, seg, standardAnalyzer, directoryPost);
 					} catch (Exception e1) {
-						logger.error(e1.getLocalizedMessage());
+						logger.error(e1);
 					}
 				}
 			}
@@ -148,10 +146,10 @@ public class Analyzer {
 		textArea.append("你： " + textField.getText() + "\n");
 		logger.info("你： " + textField.getText());
 		
-		if(singleRound) {
+		if(type.equals("singleRound")) {
 			queryStr = singleRoundQuery();
-		}else if(multiRound) {
-			queryStr = roundRoundQuery();
+		}else{
+			queryStr = multiRoundQuery();
 		}
 		
 		textField.setText("");
@@ -262,14 +260,22 @@ public class Analyzer {
 					return Double.compare(c2.getScore(), c1.getScore());
 				}
 			});
-			
-			if(multiRound) {
-				multiRound(commentList);
-			}
-			if(singleRound) {
+
+			switch (type) {
+			case "singleRound":
 				singleRound(commentList);
+				break;
+			case "multiRoundQ1Keyword":
+				multiRoundQ1Keyword(commentList);
+				break;
+			case "multiRoundQ1":
+				multiRoundQ1(commentList);
+				break;
+			case "multiRoundQ1R1":
+				multiRoundQ1R1(commentList);
+				break;
 			}
-				
+
 		}else {
 			textArea.append("輸入錯誤，再說多次吧。" + "\n");
 		}
@@ -296,25 +302,19 @@ public class Analyzer {
 		cntRound = 0;
 		reply = new ArrayList<String>();
 		txtHashMap = new HashMap<String, Integer>();
-	}
-	
-	public void setSingleRound (boolean singleRound) {
-		this.singleRound = singleRound;
-		reset();
 		textArea.setText("我係自動回答機械人，隨便說吧:" + "\n");
 	}
 	
-	public void setMultiRound (boolean multiRound) {
-		this.multiRound = multiRound;
+	public void setType (String type) {
+		this.type = type;
 		reset();
-		textArea.setText("我係自動回答機械人，隨便說吧:" + "\n");
 	}
 	
 	public String singleRoundQuery() {
 		return textField.getText();
 	}
 	
-	public String roundRoundQuery() {
+	public String multiRoundQuery() {
 		if(cntRound == 3) {
 			reset();
 		}
@@ -331,7 +331,7 @@ public class Analyzer {
 		}
 	}
 	
-	public void multiRound(List<Comment> commentList) {
+	public void multiRoundQ1Keyword(List<Comment> commentList) {
 		//do the count
 		Map<String, Integer> txtHashMap = new HashMap<String, Integer>();
 		for(Comment c : commentList) {
@@ -390,6 +390,63 @@ public class Analyzer {
 				logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
 			}
 			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+		}
+	}
+	
+	public void multiRoundQ1(List<Comment> commentList) {
+		extendqueryStr = queryStr;
+		if(cntRound == 0) {
+			textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+			logger.info("機械人： " + commentList.get(0).getContent());
+			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+			for (Comment c : commentList) {
+				logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+			}
+			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+		}else {
+			Iterator<Comment> i = commentList.iterator();
+			while (i.hasNext()) {
+				Comment c = i.next();
+				for(String r : reply)
+					if((c.getId() + "-" + c.getI()).equals(r))
+						i.remove();
+			}
+			textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+			logger.info("機械人： " + commentList.get(0).getContent());
+			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+			for (Comment c : commentList) {
+				logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+			}
+			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+		}
+	}
+	
+	public void multiRoundQ1R1(List<Comment> commentList) {
+		if(cntRound == 0) {
+			textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+			logger.info("機械人： " + commentList.get(0).getContent());
+			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+			for (Comment c : commentList) {
+				logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+			}
+			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+			extendqueryStr = queryStr + commentList.get(0).getContent().trim();
+		}else {
+			Iterator<Comment> i = commentList.iterator();
+			while (i.hasNext()) {
+				Comment c = i.next();
+				for(String r : reply)
+					if((c.getId() + "-" + c.getI()).equals(r))
+						i.remove();
+			}
+			textArea.append("機械人： " + commentList.get(0).getContent().trim() + "\n");
+			logger.info("機械人： " + commentList.get(0).getContent());
+			logger.info("以下是相似度前 " + commentList.size() + " 高的回覆");
+			for (Comment c : commentList) {
+				logger.info(c.getId() + "-" + c.getI() + "  " + c.getContent() + "  " + nf.format(c.getScore()));
+			}
+			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
+			extendqueryStr = queryStr + commentList.get(0).getContent().trim();
 		}
 	}
 }
