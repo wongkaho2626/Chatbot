@@ -2,8 +2,11 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
@@ -38,6 +41,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.similarities.BM25Similarity;
+import org.apache.lucene.search.similarities.BooleanSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
@@ -70,7 +75,10 @@ public class Analyzer {
 	Map<String, Integer> txtHashMap = new HashMap<String, Integer>();
 	
 	Logger logger = Logger.getLogger(Analyzer.class);
-
+	
+	//do the evaluation
+	boolean evaluation = false;
+	
 	public Analyzer(JTextField textField, JTextArea textArea, JButton btn) {
 		this.textField = textField;
 		this.textArea = textArea;
@@ -140,6 +148,10 @@ public class Analyzer {
 				}
 			}
 		});
+		
+		if(evaluation) {
+			evaluation();
+		}
 	}
 	
 	private void sendRequest(JTextArea textArea, mmseg4j seg, StandardAnalyzer standardAnalyzer, Directory directoryPost) throws Exception{
@@ -448,5 +460,188 @@ public class Analyzer {
 			reply.add(commentList.get(0).getId() + "-" + commentList.get(0).getI());
 			extendqueryStr = queryStr + commentList.get(0).getContent().trim();
 		}
+	}
+	
+	public void evaluation() throws IOException {
+		System.out.println("Start to do evaluation.");
+		BufferedReader br = null;
+		FileReader fr = null;
+		BufferedWriter bw = null;
+		FileWriter fw = null;
+		File file = new File("Evaluation Result");
+		List<String> evaluationDataList = new ArrayList<String>();
+		int cntL0 = 0;
+		int cntL1 = 0;
+		int cntL2 = 0;
+		int cntNotMatch = 0;
+		try {
+			br = new BufferedReader(new FileReader("/Users/wongkaho/Eclipse Workspace/Chatbot/resources/evaluationData"));
+			fr = new FileReader("/Users/wongkaho/Eclipse Workspace/Chatbot/resources/evaluationData");
+			br = new BufferedReader(fr);
+			String sCurrentLine;
+			while ((sCurrentLine = br.readLine()) != null) {
+				evaluationDataList.add(sCurrentLine);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (br != null)
+					br.close();
+				if (fr != null)
+					fr.close();
+			} catch (IOException ex) {
+				ex.printStackTrace();
+			}
+		}
+		
+		for(String queryStr : evaluationDataList) {
+			try {
+				fw = new FileWriter(file.getAbsoluteFile(), true);
+				bw = new BufferedWriter(fw);
+				Integer currentID = null;
+				
+				bw.write("你： " + queryStr);
+				bw.newLine();
+
+
+				String querystrAfterChineseTextSegmentation = seg.segmentation(queryStr);
+				System.out.println(querystrAfterChineseTextSegmentation);
+
+				Query query = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
+
+				int hitsPerPage = 10;
+				IndexReader indexReader = DirectoryReader.open(directoryPost);
+				IndexSearcher indexSearcher = new IndexSearcher(indexReader);
+				indexSearcher.setSimilarity(new BM25Similarity((float)1.2, 1));
+				ScoreDoc scoreDoc = new ScoreDoc(20, 200);
+				TopScoreDocCollector topScoreDocCollector = TopScoreDocCollector.create(hitsPerPage, scoreDoc);
+				indexSearcher.search(query, topScoreDocCollector);
+				ScoreDoc[] hits = topScoreDocCollector.topDocs().scoreDocs;
+
+				standardAnalyzer = new StandardAnalyzer();
+				RAMDirectory directoryComment = new RAMDirectory();
+				IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+				IndexWriter indexWriter = new IndexWriter(directoryComment, indexWriterConfig);
+				List<Post> postList = new ArrayList<Post>();
+				List<Comment> commentList = new ArrayList<Comment>();
+
+				DecimalFormat nf = new DecimalFormat("#0.000000");
+
+				HashMap commentHashMap = new HashMap();
+				for(int i = 0; i < hits.length; ++i) {
+					int docId = hits[i].doc;
+					Document d = indexSearcher.doc(docId);
+					int shortID = Integer.valueOf(d.get("id")) / 10000;
+					if(i == 0) {
+						currentID = Integer.valueOf(d.get("id"));
+					}
+					JSONParser parserComment = new JSONParser();
+					JSONArray comments = (JSONArray) parserComment.parse(new FileReader(RESOURCE + COMMENT + shortID + ".json"));
+					for(Object objectComment : comments) {
+						JSONObject comment = (JSONObject) objectComment;
+						String id = (String) comment.get("id");
+						JSONArray contents = (JSONArray) comment.get("contents");
+						commentHashMap.put(id, contents);
+					}
+				}
+
+				for(int i = 0; i < hits.length; ++i) {
+					int docId = hits[i].doc;
+					Document d = indexSearcher.doc(docId);
+					Post p = new Post();
+					JSONArray contents = (JSONArray) commentHashMap.get(d.get("id"));
+					for(Object o : contents) {
+						JSONObject jo = (JSONObject) o;
+						String content = jo.get("content").toString();
+						String contentAfterSegmentation = jo.get("contentAfterSegmentation").toString();
+						String I = jo.get("i").toString();
+						if(Integer.valueOf(I) > 1) {
+							addContent(indexWriter, contentAfterSegmentation, d.get("id"), I);
+							Comment c = new Comment();
+							c.setId(d.get("id"));
+							c.setI(I);
+							c.setContent(content.trim());
+							c.setContentAfterSegmentation(contentAfterSegmentation);
+							c.setScore(0);
+							if(!c.getContent().isEmpty()) {
+								commentList.add(c);
+							}
+						}
+					}
+					p.setId(d.get("id"));
+					p.setTitle(d.get("title").replace(" | ", ""));
+					p.setScore(hits[i].score * hits[i].score);
+					postList.add(p);
+				}
+				
+				indexWriter.close();
+				indexReader.close();
+
+				//calculate the result
+				hitsPerPage = 100;
+				IndexReader indexReaderComment = DirectoryReader.open(directoryComment);
+				IndexSearcher indexSearcherComment = new IndexSearcher(indexReaderComment);
+				indexSearcherComment.setSimilarity(new BM25Similarity());
+				TopScoreDocCollector topScoreDocCollectorComment = TopScoreDocCollector.create(hitsPerPage);
+				Query query2 = new QueryParser("title", standardAnalyzer).parse(querystrAfterChineseTextSegmentation);
+				indexSearcherComment.search(query2, topScoreDocCollectorComment);
+				hits = topScoreDocCollectorComment.topDocs().scoreDocs;
+				for(Comment c : commentList) {
+					float postScore = 0;
+
+					for(int i = 0; i < hits.length; ++i) {
+						int docId = hits[i].doc;
+						Document d = indexSearcherComment.doc(docId);
+
+						if(c.getId().equals(d.get("id")) && c.getI().equals(d.get("i"))) {
+							float score = (hits[i].score * hits[i].score);
+							c.setScore((postScore + score) / Integer.valueOf(c.getI()));
+						}
+						
+						if(c.getContent().contains("�")) {
+							c.setScore(0);
+						}
+					}
+				}
+
+				//sort the commentList
+				Collections.sort(commentList, new Comparator<Comment>() {
+					public int compare(Comment c1, Comment c2) {
+						return Double.compare(c2.getScore(), c1.getScore());
+					}
+				});
+				
+				if(Integer.parseInt(commentList.get(0).getId()) != currentID) {
+					if(commentList.get(0).getContent().trim().contains("L0(+0)")) {
+						bw.write("機械人： " + commentList.get(0).getContent().trim().replace("L0(+0)", "Not match"));
+					}else if(commentList.get(0).getContent().trim().contains("L1(+1)")){
+						bw.write("機械人： " + commentList.get(0).getContent().trim().replace("L1(+2)", "Not match"));
+					}else if(commentList.get(0).getContent().trim().contains("L2(+2)")){
+						bw.write("機械人： " + commentList.get(0).getContent().trim().replace("L2(+2)", "Not match"));
+					}
+					cntNotMatch++;
+				}else {
+					bw.write("機械人： " + commentList.get(0).getContent().trim());
+					if(commentList.get(0).getContent().trim().contains("L0(+0)")) {
+						cntL0++;
+					}else if(commentList.get(0).getContent().trim().contains("L1(+1)")){
+						cntL1++;
+					}else if(commentList.get(0).getContent().trim().contains("L2(+2)")){
+						cntL2++;
+					}	
+				}
+				bw.newLine();
+
+				if(bw != null)
+					bw.close();
+				if(fw != null)
+					fw.close();
+			} catch (Exception e1) {
+				logger.error(e1);
+			}
+		}
+		System.out.println("Not Match: " + cntNotMatch + ", L0(+0): " + cntL0 + ", L1(+1): " + cntL1 + ", L2(+2): " + cntL2);
+		System.out.println("Evaluation end.");
 	}
 }

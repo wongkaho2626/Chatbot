@@ -65,10 +65,10 @@ public class Chatbot extends JFrame{
 	private JMenu exitMenu;
 	private JMenu advancedMenu;
 	private JMenuItem mntmExit;
-	private JMenuItem mntmSingleroundConservation;
-	private JMenuItem mntmMultiroundQ1KeywordConservation;
-	private JMenuItem mntmMultiroundQ1Conservation;
-	private JMenuItem mntmMultiroundQ1R1Conservation;
+	private JMenuItem mntmSingleroundConversation;
+	private JMenuItem mntmMultiroundQ1KeywordConversation;
+	private JMenuItem mntmMultiroundQ1Conversation;
+	private JMenuItem mntmMultiroundQ1R1Conversation;
 	static Analyzer analyzer;
 	Logger logger = Logger.getLogger(Chatbot.class);
 
@@ -98,44 +98,44 @@ public class Chatbot extends JFrame{
 		normalMenu = new JMenu("Normal");
 		menuBar.add(normalMenu);
 		
-		mntmSingleroundConservation = new JMenuItem("Single-Round Conservation");
-		mntmSingleroundConservation.addActionListener(new ActionListener() {
+		mntmSingleroundConversation = new JMenuItem("Single-Round Conservation");
+		mntmSingleroundConversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				analyzer.setType("singleRound");
 			}
 		});
-		normalMenu.add(mntmSingleroundConservation);
+		normalMenu.add(mntmSingleroundConversation);
 		
 		advancedMenu = new JMenu("Advanced");
 		menuBar.add(advancedMenu);
 		
-		mntmMultiroundQ1KeywordConservation = new JMenuItem("Multi-Round Conservation: Q1 with Keyword");
-		mntmMultiroundQ1KeywordConservation.addActionListener(new ActionListener() {
+		mntmMultiroundQ1KeywordConversation = new JMenuItem("Multi-Round Conversation: Q1 with Keyword");
+		mntmMultiroundQ1KeywordConversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				analyzer.setType("multiRoundQ1Keyword");
 			}
 		});
-		advancedMenu.add(mntmMultiroundQ1KeywordConservation);
+		advancedMenu.add(mntmMultiroundQ1KeywordConversation);
 		
-		mntmMultiroundQ1Conservation  = new JMenuItem("Multi-Round Conservation: Q1");
-		mntmMultiroundQ1Conservation.addActionListener(new ActionListener() {
+		mntmMultiroundQ1Conversation = new JMenuItem("Multi-Round Conversation: Q1");
+		mntmMultiroundQ1Conversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				analyzer.setType("multiRoundQ1");
 			}
 		});
-		advancedMenu.add(mntmMultiroundQ1Conservation);
+		advancedMenu.add(mntmMultiroundQ1Conversation);
 		
-		mntmMultiroundQ1R1Conservation   = new JMenuItem("Multi-Round Conservation: Q1 and R1");
-		mntmMultiroundQ1R1Conservation.addActionListener(new ActionListener() {
+		mntmMultiroundQ1R1Conversation = new JMenuItem("Multi-Round Conversation: Q1 and R1");
+		mntmMultiroundQ1R1Conversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				analyzer.setType("multiRoundQ1R1");
 			}
 		});
-		advancedMenu.add(mntmMultiroundQ1R1Conservation);
+		advancedMenu.add(mntmMultiroundQ1R1Conversation);
 		
 		
 		exitMenu = new JMenu("Exit");
