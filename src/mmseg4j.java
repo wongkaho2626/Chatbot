@@ -1,7 +1,6 @@
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.HashSet;
 
 import com.chenlb.mmseg4j.ComplexSeg;
 import com.chenlb.mmseg4j.Dictionary;

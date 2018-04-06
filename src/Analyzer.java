@@ -16,10 +16,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.swing.JButton;
 import javax.swing.JTextArea;
@@ -41,8 +41,6 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.similarities.BM25Similarity;
-import org.apache.lucene.search.similarities.BooleanSimilarity;
-import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
@@ -106,19 +104,22 @@ public class Analyzer {
 			indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
 			indexWriter = new IndexWriter(directoryPost, indexWriterConfig);
 
-			textArea.append("載入 3922512 個標題中... \n");
-			logger.info("載入 3922512 個標題中...");
+			textArea.append("載入 4679412 個標題中... \n");
+			logger.info("載入 4679412 個標題中...");
 			JSONParser parserPost = new JSONParser();
 			JSONArray posts = (JSONArray) parserPost.parse(new FileReader(RESOURCE + POST + ".json"));
+			int cnt = 0;
 			for(Object object : posts) {
 				JSONObject post = (JSONObject) object;
 				String title = (String) post.get("title");
 				String id = (String) post.get("id");
 				addContent(indexWriter, title, id);
+				cnt++;
 			}
+			System.out.println(cnt);
 			indexWriter.close();
-			textArea.append("3922512 個標題已完成載入\n");
-			logger.info("3922512 個標題已完成載入");
+			textArea.append("4679412 個標題已完成載入\n");
+			logger.info("4679412 個標題已完成載入");
 		}
 
 		textArea.append("我係自動回答機械人，隨便說吧: \n");
@@ -278,7 +279,7 @@ public class Analyzer {
 				singleRound(commentList);
 				break;
 			case "multiRoundQ1Keyword":
-				multiRoundQ1Keyword(commentList);
+				multiRoundQ1Keyword(commentList, querystrAfterChineseTextSegmentation);
 				break;
 			case "multiRoundQ1":
 				multiRoundQ1(commentList);
@@ -314,7 +315,7 @@ public class Analyzer {
 		cntRound = 0;
 		reply = new ArrayList<String>();
 		txtHashMap = new HashMap<String, Integer>();
-		textArea.setText("我係自動回答機械人，隨便說吧:" + "\n");
+//		textArea.setText("我係自動回答機械人，隨便說吧:" + "\n");
 	}
 	
 	public void setType (String type) {
@@ -343,7 +344,7 @@ public class Analyzer {
 		}
 	}
 	
-	public void multiRoundQ1Keyword(List<Comment> commentList) {
+	public void multiRoundQ1Keyword(List<Comment> commentList, String querystrAfterChineseTextSegmentation) {
 		//do the count
 		Map<String, Integer> txtHashMap = new HashMap<String, Integer>();
 		for(Comment c : commentList) {
@@ -369,13 +370,18 @@ public class Analyzer {
 				return ((Map.Entry<String, Integer>) o2).getValue().compareTo(((Map.Entry<String, Integer>) o1).getValue());
 		    }
 		});
+		
+		List<String> items = Arrays.asList(querystrAfterChineseTextSegmentation.split("\\s* | \\s*"));
+		HashSet<String> hashSet = new HashSet<String>();  
+
+		for(String item : items) {
+			hashSet.add(item);
+			System.out.println(item);
+		}
+		
 		for (Object e : a) {
-			int length = ((Map.Entry<String, Integer>) e).getKey().toString().trim().length();
-			if(queryStr.contains(((Map.Entry<String, Integer>) e).getKey()) && ((Map.Entry<String, Integer>) e).getKey().length() > 1) {
-				System.out.println(((Map.Entry<String, Integer>) e).getKey() + " : " + ((Map.Entry<String, Integer>) e).getValue());
-				if(!extendqueryStr.contains(((Map.Entry<String, Integer>) e).getKey())) {
-					extendqueryStr = extendqueryStr + " " + ((Map.Entry<String, Integer>) e).getKey();
-				}
+			if(hashSet.contains(((Map.Entry<String, Integer>) e).getKey())) {
+				extendqueryStr = extendqueryStr + " " + ((Map.Entry<String, Integer>) e).getKey();
 			}
 		}
 		

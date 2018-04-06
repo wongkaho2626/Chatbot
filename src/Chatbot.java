@@ -1,19 +1,6 @@
-import java.awt.Color;
-import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Paths;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
 
 import javax.swing.GroupLayout;
 import javax.swing.JButton;
@@ -30,30 +17,13 @@ import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.border.EmptyBorder;
 
 import org.apache.log4j.Logger;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TopScoreDocCollector;
-import org.apache.lucene.search.similarities.BM25Similarity;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.RAMDirectory;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 public class Chatbot extends JFrame{	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	private JPanel contentPane;
 	private static JTextField textField;
 	private static JTextArea textArea;
@@ -102,6 +72,7 @@ public class Chatbot extends JFrame{
 		mntmSingleroundConversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				textArea.append("Single-Round Conservation \n");
 				analyzer.setType("singleRound");
 			}
 		});
@@ -114,6 +85,7 @@ public class Chatbot extends JFrame{
 		mntmMultiroundQ1KeywordConversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				textArea.append("Multi-Round Conversation: Q1 with Keyword \n");
 				analyzer.setType("multiRoundQ1Keyword");
 			}
 		});
@@ -123,6 +95,7 @@ public class Chatbot extends JFrame{
 		mntmMultiroundQ1Conversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				textArea.append("Multi-Round Conversation: Q1 \n");
 				analyzer.setType("multiRoundQ1");
 			}
 		});
@@ -132,6 +105,7 @@ public class Chatbot extends JFrame{
 		mntmMultiroundQ1R1Conversation.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				textArea.append("Multi-Round Conversation: Q1 and R1 \n");
 				analyzer.setType("multiRoundQ1R1");
 			}
 		});
